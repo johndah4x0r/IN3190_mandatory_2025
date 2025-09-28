@@ -5,7 +5,8 @@
 PROJECT_DATA_ZIP := archives/project_data.zip
 
 all: seismic_data/
-
+	python3 run_all.py
+	
 clean:
 
 purge:

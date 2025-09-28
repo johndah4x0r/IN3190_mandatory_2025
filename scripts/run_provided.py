@@ -33,8 +33,9 @@ from geopy.distance import great_circle
 import multiprocessing
 
 # Type hints
-from typing import Optional
+from typing import Optional, Tuple
 
+# Module to measure elapsed time
 import time
 
 # Set path for data
@@ -310,7 +311,34 @@ def circle_distance(n_files, lats, lons, tonga_latlon):
     return dists_km
 
 
-def __main():
+def main() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Main routine for `run_provided`
+
+    The routine reads raw station data, stores them in distinct arrays
+    containing seismic data, time stamps, location and time steps.
+
+    Parameters
+    ----------
+    Does not accept any parameters
+
+    Returns
+    -------
+    data_collection : np.ndarray
+        An array with the shape (S,T), where `S` is the number
+        of stations, and `T` is the number of data points
+    times_collection : np.ndarray
+        An array with the shape (S,T), where `S` is the number
+        of stations, and `T` is the number of time stamps
+
+    lats, lons : np.ndarray
+        Flat arrays containing the geographical location
+        of the stations
+
+    dt : np.ndarray
+        A flat array containing the time step for each station
+    """
+
     print(
         " I: Found %d logical cores (%d reserved, %d free)"
         % (logical_cores, reserved_cores, free_cores)
@@ -326,8 +354,18 @@ def __main():
     # Map
     plot_map(lats, lons, tonga_latlon)
 
+    # Obtain great circle distances
+    # - the shortest and longest distances are already
+    # written to standard output, so I don't exactly
+    # know what to do with the returned array
     dists_km = circle_distance(n_files, lats, lons, tonga_latlon)
+
+    # Return segregated data
+    return data_collection, times_collection, lats, lons, dt
 
 
 if __name__ == "__main__":
-    __main()
+    # Disallow direct execution
+    print(" E: Direct execution not allowed")
+    print("Please use `run_all.py' instead")
+    sys.exit(1)

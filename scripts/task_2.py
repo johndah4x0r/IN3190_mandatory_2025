@@ -21,6 +21,16 @@ from numba import njit, prange
 from typing import Union, Tuple
 
 
+# Filter type with human-readable name
+FILTER_TYPE: dict = {
+    -1: "unknown",
+    0: "low-pass",
+    1: "band-pass",
+    2: "band-stop",
+    3: "high-pass",
+}
+
+
 # Performs linear convolution between `x` and `h`
 # - use fast methods and strict type discipline
 @njit(parallel=True, fastmath=True)
@@ -183,7 +193,7 @@ def task_2a():
 
     Returns
     -------
-    Does not return any value.
+    Does not return any values
     """
 
     print(" I: Executing task 2a...")
@@ -193,9 +203,9 @@ def task_2a():
     n = np.arange(0, least)
 
     # Plot the impulse responses
-    plt.plot(n, h1[n], "-o", label="$h_1$")
-    plt.plot(n, h2[n], "-o", label="$h_2$")
-    plt.plot(n, h3[n], "-o", label="$h_3$")
+    plt.plot(n, h1[n], "--.", label="$h_1$")
+    plt.plot(n, h2[n], "--.", label="$h_2$")
+    plt.plot(n, h3[n], "--.", label="$h_3$")
 
     # - set up grid and legend
     plt.grid()
@@ -220,14 +230,14 @@ def task_2b():
 
     Returns
     -------
-    Does not return any value
+    Does not return any values
     """
 
     print(" I: Executing task 2b...")
 
     # Set up toy signal and impulse response
-    x = np.array([0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0])      # - rectangular pulse
-    h = np.array([3, 2, 1, 0])                           # - triangular filter
+    x = np.array([0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0])  # - rectangular pulse
+    h = np.array([3, 2, 1, 0])  # - triangular filter
 
     # Calculate same and full convolutions
     c_same = convolve(x, h, 0)
@@ -240,11 +250,11 @@ def task_2b():
     n_full = np.arange(len(x) + len(h) - 1)
 
     # Plot calculated and reference values
-    plt.plot(n_same, c_same, '-o', label="same")
-    plt.plot(n_full, c_full, '-o', label="full")
+    plt.plot(n_same, c_same, "-", label="same")
+    plt.plot(n_full, c_full, "-", label="full")
 
-    plt.plot(n_same, ref_same, '--o', label="same, reference")
-    plt.plot(n_full, ref_full, '--o', label="full, reference")
+    plt.plot(n_full, ref_full, "--", label="full, reference")
+    plt.plot(n_same, ref_same, "--", label="same, reference")
 
     # Set up grid and legend
     plt.grid()
@@ -255,26 +265,157 @@ def task_2b():
 
 
 def task_2c():
+    """
+    A dummy method for task 2c
+
+    Parameters
+    ----------
+    Does not accept any parameters
+
+    Returns
+    -------
+    Does not return any values
+    """
+    print(" W: Task 2c is an implementation task")
     pass
 
 
-def task_2d():
-    pass
+def task_2d(
+    n_points: int = 1000, fs: float = 100.0
+) -> Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray], np.ndarray]:
+    """
+    A method that satisfies task 2d
+
+    Parameters
+    ----------
+    n_point : int = 1000
+        Number of points on the unit circle
+    fs : float = 100.0
+        Sampling frequency (in hertz)
+
+    Returns
+    -------
+    mag_1, mag_2, mag_3 : np.ndarray
+        Magnitudes for the DTFT of filters
+        `h1`, `h2`, `h3`
+    freqs : np.ndarray
+        Array of frequencies (in hertz)
+    """
+
+    print(f" I: Executing task 2d (n_points = {n_points}, fs(.3f) = {fs:.3f} Hz)")
+
+    # Calculate the DTFT of the impulse responses
+    # - also receive the frequencies array
+    H_1, freqs = dtft(h1, n_points, fs)
+    H_2, _ = dtft(h2, n_points, fs)
+    H_3, _ = dtft(h3, n_points, fs)
+
+    # Calculate the magnitudes
+    H_1_mag, H_2_mag, H_3_mag = np.abs(H_1), np.abs(H_2), np.abs(H_3)
+
+    # Obtain only the first half of the spectrum
+    # - include Nyquist frequency whenever possible
+    freqs = freqs[: n_points // 2 + 1]
+    H_1_mag = H_1_mag[: n_points // 2 + 1]
+    H_2_mag = H_2_mag[: n_points // 2 + 1]
+    H_3_mag = H_3_mag[: n_points // 2 + 1]
+
+    # Plot the magnitudes
+    # - plot only the first half
+    plt.plot(freqs, H_1_mag, "-", label="response $h_1$")
+    plt.plot(freqs, H_2_mag, "--", label="response $h_2$")
+    plt.plot(freqs, H_3_mag, "--", label="response $h_3$")
+
+    # Set up grid and legend
+    plt.grid()
+    plt.legend()
+
+    # Set up title and axis labels
+    plt.title("Frequency response of FIR filters")
+    plt.xlabel("Frequency [Hz]")
+    plt.ylabel("Magnitude $|H|$ [1]")
+
+    # Show plot
+    plt.show()
+
+    # Return magnitudes and frequencies
+    return (H_1_mag, H_2_mag, H_3_mag), freqs
 
 
 def task_2e():
+    """
+    A dummy method for task 2e
+
+    Parameters
+    ----------
+    Does not accept any parameters
+
+    Returns
+    -------
+    Does not return any values
+    """
+
+    print(" W: Task 2e is a qualitative task")
     pass
 
 
-def task_2f():
+def task_2f(
+    res_1: np.ndarray, res_2: np.ndarray, res_3: np.ndarray, s_data: np.ndarray
+):
+    """
+    A method that satisfies task 2f
+
+    Parameters
+    ----------
+    res_1, res_2, res_3: np.ndarray
+        Arrays with the shape (S,T), where `S` is the number
+        of stations, and `T` is the number of samples
+        (separated by time)
+
+        These arrays are mutable (they're not copy-on-write
+        by default), and will be populated with filtered
+        data.
+
+    Returns
+    -------
+    Does not return any values
+    """
+
     pass
 
 
-def task_2g():
+def task_2g(res: np.ndarray):
     pass
 
 
-def main():
+def main(
+    n_points: int = 1000,
+    fs: float = 100.0,
+    s_data: Optional[np.ndarray] = None,
+    show_section: bool = False,
+) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """
+    Main method for task 2
+
+    Parameters
+    ----------
+    n_points : int = 1000
+        Number of points on the unit circle
+        (relevant for task 2d)
+    fs : float = 100.0
+        Sampling frequency (in hertz)
+        (relevant for task 2d)
+    s_data : Optional[np.ndarray] = None
+        Data samples from stations
+    show_section : bool = False
+        Determines whether to show a section plot
+
+    Returns
+    -------
+    (res_1, res_2, res_3) | None : Optional[Tuple[np.ndarray]]
+        Filtered station data
+    """
+
     # Set up temporary arrays and
     # warm up functions
     __r1 = np.random.rand(100)
@@ -291,9 +432,52 @@ def main():
     task_2a()
     task_2b()
     task_2c()
-    task_2d()
+    task_2d(n_points, fs)
     task_2e()
-    task_2f()
+
+    # - do not proceed if station data is not provided
+    if not s_data:
+        return None
+    # - (fall-through)
+
+    # Set up result arrays
+    # - fan out instantiation to prevent COW
+    res_1 = np.zeros_like(s_data)
+    res_2 = np.zeros_like(s_data)
+    res_3 = np.zeros_like(s_data)
+
+    # Run tasks 2f and 2g
+    task_2f(res_1, res_2, res_3, s_data)
+
+    if show_section:
+        # - show section plot only if requested
+        task_2g()
+    else:
+        # - show filtered data for *one* station
+        example_1 = res_1[0]
+        example_2 = res_2[0]
+        example_3 = res_3[0]
+
+        # - generate time array in arbitrary units
+        t = np.arange(len(example_1))
+
+        # - plot filtered data
+        plt.plot(t, example_1, label="$D_0 * h_1$")
+        plt.plot(t, example_2, label="$D_0 * h_2$")
+        plt.plot(t, example_3, label="$D_0 * h_3$")
+
+        # - show grid and legend
+        plt.grid()
+        plt.legend()
+
+        # - set up title and axis labels
+        plt.title("Filtered station data")
+        plt.xlabel("Generalized time [a.u.]")
+        plt.ylabel("Station signal [a.u.]")
+
+        # - show figure
+        plt.show()
+
 
 # In case we get imported:
 # set up temporary arrays

@@ -22,5 +22,15 @@ import sys
 from numba import njit
 import multiprocessing
 
-# Import scripts
-import scripts
+# Import sub-scripts
+# - these scripts satisfy tasks 1, 2
+from scripts import run_provided, task_2
+
+# Run the provided script (task 1), then take
+# ownership of the returned station data
+s_data, s_times, s_lats, s_lons, s_dt = run_provided.main()
+
+# Run main routine for task 2, then take
+# ownereship of the returned filtered data
+# - don't show section data just yet
+filtered = task_2.main(1000, 100.0, s_data, False)
