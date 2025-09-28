@@ -12,9 +12,9 @@ from .fir import h1, h2, h3, LEN_H1, LEN_H2, LEN_H3
 
 # Import modules for general analysis
 import numpy as np
-from numpy.fft import rfft, irfft
 import matplotlib.pyplot as plt
 from scipy.signal import fftconvolve
+from scipy.fft import rfft, irfft
 
 # Systems acceleration
 from numba import njit, prange
@@ -407,15 +407,23 @@ def task_2f(
     t0 = time.time()
 
     # Perform manual FFT-based convolution
+    # - this approach is supposedly faster, and saturates
+    # memory lines earlier, though this would mean that
+    # execution time is strongly dependent on the number
+    # of RAM lanes, and the DRAM refresh rate
+
     N = s_data.shape[1]  # - obtain number of data points
     filters = [h1, h2, h3]  # - line up filters
-    X = rfft(s_data, n=N, axis=1)  # - calculate FFT of matrix
+    X = rfft(s_data, n=N, axis=1, workers=-1)  # - calculate FFT 2-tensor
 
     # - pad each filter to N, then calculate FFT
-    H = np.stack([rfft(h, n=N) for h in filters])
+    H = np.stack([rfft(h, n=N, workers=-1) for h in filters])
 
-    # Calculate result
-    Y = irfft(H[:, None, :] * X[None, :, :], n=N, axis=2)
+    # Calculate resulting 3-tensor, which is the
+    # convolution of `s_data` and all 3 kernels
+    Y = irfft(H[:, None, :] * X[None, :, :], n=N, axis=2, workers=-1)
+
+    # - split result by kernel (on planes 0, 1, 2)
     res_1, res_2, res_3 = Y[0], Y[1], Y[2]
 
     t1 = time.time()

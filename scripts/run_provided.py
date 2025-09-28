@@ -84,34 +84,40 @@ def _parse(attrs: (str, int)):
     n_samples = attrs[1]
 
     # Read from provided file
-    raw_data = h5py.File(fname, "r")
+    with h5py.File(fname, "r") as raw_data:
+        # Read the latitude and longitude attributes for the station and put into vectors
+        lats = np.array(raw_data.attrs["latitude"])
+        lons = np.array(raw_data.attrs["longitude"])
 
-    # Read the latitude and longitude attributes for the station and put into vectors
-    lats = np.array(raw_data.attrs["latitude"])
-    lons = np.array(raw_data.attrs["longitude"])
+        # Read tree structure and load dataset into aggregate array
+        level1 = list(raw_data.keys())  # /waveforms
+        level2 = list(raw_data[level1[0]].keys())  # /waveforms/dataset_name
+        dataset = raw_data[
+            "/" + level1[0] + "/" + level2[0]
+        ]  # Reading dataset in subgroup
 
-    # Read tree structure and load dataset into aggregate array
-    level1 = list(raw_data.keys())  # /waveforms
-    level2 = list(raw_data[level1[0]].keys())  # /waveforms/dataset_name
-    dataset = raw_data["/" + level1[0] + "/" + level2[0]]  # Reading dataset in subgroup
+        data = dataset[:]  # Extract numpy array from dataset object
 
-    data = dataset[:]  # Extract numpy array from dataset object
+        # If missing data, pad with zeros
+        if len(data) < n_samples:
+            data = np.pad(
+                data, (0, n_samples - len(data)), "constant", constant_values=0
+            )
 
-    # If missing data, pad with zeros
-    if len(data) < n_samples:
-        data = np.pad(data, (0, n_samples - len(data)), "constant", constant_values=0)
+        # Figure out the start time and generate a time vector
+        start_time_str = dataset.attrs["starttime"]
+        start_time = dateutil.parser.isoparse(
+            start_time_str
+        )  # Time attribute on ISO-format
 
-    # Figure out the start time and generate a time vector
-    start_time_str = dataset.attrs["starttime"]
-    start_time = dateutil.parser.isoparse(
-        start_time_str
-    )  # Time attribute on ISO-format
+        dt = dataset.attrs["delta"]
+        deltas = np.linspace(
+            0, dt * (n_samples - 1), n_samples
+        )  # A duration which can be added to a datetime object
+        times = start_time + deltas * timedelta(seconds=1)
 
-    dt = dataset.attrs["delta"]
-    deltas = np.linspace(
-        0, dt * (n_samples - 1), n_samples
-    )  # A duration which can be added to a datetime object
-    times = start_time + deltas * timedelta(seconds=1)
+        # Convert times to 64-bit integers
+        times = np.array(times, dtype="datetime64[ns]")
 
     return data, times, lats, lons, dt
 
@@ -147,7 +153,9 @@ def _unpack(
 
     # Initialize grid arrays
     data_collection = np.zeros((n_files, n_samples))  # Station data
-    times_collection = np.zeros((n_files, n_samples), dtype=datetime)  # Time stamps
+    times_collection = np.zeros(
+        (n_files, n_samples), dtype="datetime64[ns]"
+    )  # Time stamps
 
     # Initialize flat arrays
     lats = np.zeros(n_files)
@@ -192,6 +200,19 @@ def parse(num_files=None, num_samples: int = 720_000):
             Collection of time steps
     """
 
+    # Load from cache
+    if os.path.exists("unpacked.h5"):
+        with h5py.File("unpacked.h5", "r") as f:
+            data_collection = f["data_collection"][:]
+            unit = f["times_collection"].attrs["unit"]
+            times_collection = f["times_collection"][:].view(f"datetime64[{unit}]")
+
+            lats = f["lats"][:]
+            lons = f["lons"][:]
+            dt = f["dt"][:]
+
+        return data_collection, times_collection, lats, lons, dt
+
     if num_files:
         N_files = num_files
     else:
@@ -227,6 +248,28 @@ def parse(num_files=None, num_samples: int = 720_000):
     t4 = time.time()
 
     print(" I: (unpacking took %.3f seconds)" % (t4 - t3))
+
+    # - unpack result syntactically
+    data_collection, times_collection, lats, lons, dt = r
+
+    # Build cache
+    print(" I: Building cache...")
+
+    with h5py.File("unpacked.h5", "w") as f:
+        f.create_dataset(
+            "data_collection", data=data_collection, chunks=None, compression=None
+        )
+        dset = f.create_dataset(
+            "times_collection",
+            data=times_collection.view("int64"),
+            chunks=None,
+            compression=None,
+        )
+        dset.attrs["unit"] = "ns"
+
+        f.create_dataset("lats", data=lats)
+        f.create_dataset("lons", data=lons)
+        f.create_dataset("dt", data=dt)
 
     print("done")
     return r
