@@ -12,14 +12,18 @@ from .fir import h1, h2, h3, LEN_H1, LEN_H2, LEN_H3
 
 # Import modules for general analysis
 import numpy as np
+from numpy.fft import rfft, irfft
 import matplotlib.pyplot as plt
+from scipy.signal import fftconvolve
 
 # Systems acceleration
 from numba import njit, prange
 
 # Type hints
-from typing import Union, Tuple
+from typing import Optional, Tuple
 
+# Timekeeping
+import time
 
 # Filter type with human-readable name
 FILTER_TYPE: dict = {
@@ -181,6 +185,24 @@ def dtft(h: np.ndarray, N: int, fs: float) -> Tuple[np.ndarray, np.ndarray]:
 
     # Return DTFT and frequencies
     return H, freqs
+
+
+# Convolve given signal matrix with FIR filter `h1`
+def __convolve_h1(m: np.ndarray) -> np.ndarray:
+    y = np.apply_along_axis(lambda x: fftconvolve(x, h1, mode="same"), 1, m)
+    return y
+
+
+# Convolve given signal matrix with FIR filter `h2`
+def __convolve_h2(m: np.ndarray) -> np.ndarray:
+    y = np.apply_along_axis(lambda x: fftconvolve(x, h2, mode="same"), 1, m)
+    return y
+
+
+# Convolve given signal matrix with FIR filter `h3`
+def __convolve_h3(m: np.ndarray) -> np.ndarray:
+    y = np.apply_along_axis(lambda x: fftconvolve(x, h3, mode="same"), 1, m)
+    return y
 
 
 def task_2a():
@@ -360,31 +382,51 @@ def task_2e():
 
 
 def task_2f(
-    res_1: np.ndarray, res_2: np.ndarray, res_3: np.ndarray, s_data: np.ndarray
-):
+    s_data: np.ndarray, serial: bool = False
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     A method that satisfies task 2f
 
     Parameters
     ----------
+    s_data : np.ndarray
+        Array containing station data, with shape (S,T), where
+        `S` is the number of stations, and `T` is the number of
+        samples (separated by time)
+
+    Returns
+    -------
     res_1, res_2, res_3: np.ndarray
         Arrays with the shape (S,T), where `S` is the number
         of stations, and `T` is the number of samples
         (separated by time)
-
-        These arrays are mutable (they're not copy-on-write
-        by default), and will be populated with filtered
-        data.
-
-    Returns
-    -------
-    Does not return any values
     """
 
-    pass
+    print(" I: Executing task 2f")
+
+    t0 = time.time()
+
+    # Perform manual FFT-based convolution
+    N = s_data.shape[1]  # - obtain number of data points
+    filters = [h1, h2, h3]  # - line up filters
+    X = rfft(s_data, n=N, axis=1)  # - calculate FFT of matrix
+
+    # - pad each filter to N, then calculate FFT
+    H = np.stack([rfft(h, n=N) for h in filters])
+
+    # Calculate result
+    Y = irfft(H[:, None, :] * X[None, :, :], n=N, axis=2)
+    res_1, res_2, res_3 = Y[0], Y[1], Y[2]
+
+    t1 = time.time()
+
+    print(" I: (operation took %.3f seconds)" % (t1 - t0))
+
+    # Return filtered data
+    return res_1, res_2, res_3
 
 
-def task_2g(res: np.ndarray):
+def task_2g(res: Optional[np.ndarray]):
     pass
 
 
@@ -393,6 +435,7 @@ def main(
     fs: float = 100.0,
     s_data: Optional[np.ndarray] = None,
     show_section: bool = False,
+    serial: bool = False,
 ) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """
     Main method for task 2
@@ -409,6 +452,9 @@ def main(
         Data samples from stations
     show_section : bool = False
         Determines whether to show a section plot
+    serial : bool = False
+        Determines whether convolution operations
+        are performed serially
 
     Returns
     -------
@@ -436,22 +482,16 @@ def main(
     task_2e()
 
     # - do not proceed if station data is not provided
-    if not s_data:
+    if s_data is None:
         return None
     # - (fall-through)
 
-    # Set up result arrays
-    # - fan out instantiation to prevent COW
-    res_1 = np.zeros_like(s_data)
-    res_2 = np.zeros_like(s_data)
-    res_3 = np.zeros_like(s_data)
-
     # Run tasks 2f and 2g
-    task_2f(res_1, res_2, res_3, s_data)
+    res_1, res_2, res_3 = task_2f(s_data, serial)
 
     if show_section:
         # - show section plot only if requested
-        task_2g()
+        task_2g(None)
     else:
         # - show filtered data for *one* station
         example_1 = res_1[0]
@@ -477,6 +517,9 @@ def main(
 
         # - show figure
         plt.show()
+
+    # Return filtered data
+    return res_1, res_2, res_3
 
 
 # In case we get imported:

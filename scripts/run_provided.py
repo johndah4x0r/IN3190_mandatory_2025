@@ -51,7 +51,7 @@ reserved_cores = 2
 free_cores = logical_cores - reserved_cores
 
 # Calculate worker count
-workers_per_core = 2
+workers_per_core = 1
 
 
 # Inner routine for `parse`
@@ -146,8 +146,8 @@ def _unpack(
     """
 
     # Initialize grid arrays
-    data_collection = np.zeros((N_files, N_samples))  # Station data
-    times_collection = np.zeros((N_files, N_samples), dtype=datetime)  # Time stamps
+    data_collection = np.zeros((n_files, n_samples))  # Station data
+    times_collection = np.zeros((n_files, n_samples), dtype=datetime)  # Time stamps
 
     # Initialize flat arrays
     lats = np.zeros(n_files)
@@ -170,14 +170,15 @@ def _unpack(
 
 
 # Read files and store contents. Accepts user input for number of files to read.
-def parse(num_files=None):
+def parse(num_files=None, num_samples: int = 720_000):
     """
     Reads files and stores their contents
 
     Accepts:
         num_files (default: None)
             Number of files to read
-
+        num_samples (default: 720_000)
+            Number of samples to read from each file
     Returns:
         data_collection: np.ndarray
             Collection of data points
@@ -197,7 +198,7 @@ def parse(num_files=None):
         N_files = len(fn_list)
 
     # Size of the datasets in the files. Hard coded unless you want dynamic allocation (lists, slower)
-    N_samples = 720000
+    N_samples = num_samples
 
     # - read files in parallel
     print(
@@ -212,14 +213,17 @@ def parse(num_files=None):
         result = p.map(_parse, p_attrs, chunksize=workers_per_core)
         t2 = time.time()
 
+        # - assume 2 * 4 bytes per data point
+        in_size = 8 * N_files * N_samples
+
         print(
-            " I: (vector operation took %.3f seconds; %.3f seconds per file)"
-            % (t2 - t1, (t2 - t1) / N_files)
+            " I: (vector operation took %.3f seconds @ %.3f MiB/s)"
+            % (t2 - t1, in_size / (t2 - t1) / (2**20))
         )
 
     # Unpack the result
     t3 = time.time()
-    r = _unpack(result, data_collection, times_collection, N_files, N_samples)
+    r = _unpack(result, N_files, N_samples)
     t4 = time.time()
 
     print(" I: (unpacking took %.3f seconds)" % (t4 - t3))
