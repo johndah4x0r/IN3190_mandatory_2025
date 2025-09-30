@@ -23,6 +23,7 @@ import sys
 # - these scripts satisfy tasks 1, 2
 from scripts import run_provided, task_2
 
+
 def main():
     """
     Main routine
@@ -51,7 +52,9 @@ def main():
     # ownereship of the returned filtered data
     # - don't show section data just yet
     print(" I: (run_all) Running `task_2.main(...)`...")
-    filtered, figs = task_2.main(1000, 100.0, s_data, show_section=False, show_plots=False)
+    filtered, figs = task_2.main(
+        1000, 100.0, s_data, show_section=False, show_plots=False
+    )
 
     # - make sure we get filtered data and figures in return,
     # as we 1) have s_data, and 2) want to show the plots elsewhere

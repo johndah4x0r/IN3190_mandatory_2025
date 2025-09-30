@@ -11,6 +11,7 @@ double as importable modules.
 # OS-related hooks
 import os
 
+
 # Checks whether the LHS file is older than the RHS file
 # - returns `True` if `lhs` is older than `rhs`, or if
 # `lhs` doesn't exist and `rhs` does

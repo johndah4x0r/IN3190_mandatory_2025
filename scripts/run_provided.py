@@ -58,6 +58,7 @@ free_cores = logical_cores - reserved_cores
 # Calculate worker count
 workers_per_core = 1
 
+
 # Inner routine for `parse`
 def _parse(attrs: (str, int)):
     """
@@ -104,14 +105,16 @@ def _parse(attrs: (str, int)):
 
         # If missing data, pad with zeros
         if len(data) < n_samples:
-            data = np.pad(data, (0, n_samples - len(data)), "constant", constant_values=0)
+            data = np.pad(
+                data, (0, n_samples - len(data)), "constant", constant_values=0
+            )
 
         # Figure out the start time and generate a time vector
-        start_time_str = dataset.attrs["starttime"] # - time attribute in ISO 8601
+        start_time_str = dataset.attrs["starttime"]  # - time attribute in ISO 8601
         start_time = np.datetime64(dateutil.parser.isoparse(start_time_str))
 
         # - convert timestep to nanoseconds
-        dt = np.timedelta64(int(dataset.attrs["delta"] * 1e9), 'ns')
+        dt = np.timedelta64(int(dataset.attrs["delta"] * 1e9), "ns")
 
         # - generate time vector
         times = start_time + np.arange(n_samples) * dt
@@ -224,15 +227,14 @@ def parse(num_files=None, num_samples: int = 720_000):
 
             # - calculate elapsed time and data rate
             elapsed = t1 - t0
-            rate = in_size / elapsed / (2**20)
+            rate = in_size / elapsed / (2**30)
 
-            print(f" I: (read took {t1-t0:.3f} seconds; eff. rate: {rate:.3f} MiB/s)")
+            print(f" I: (read took {t1-t0:.3f} seconds; eff. rate: {rate:.3f} GiB/s)")
 
             # - return only if the cache is "sane"
             return data_collection, times_collection, lats, lons, dt
         except (OSError, KeyError) as e:
             print(f" W: Cache invalid ({e}); rebuilding....")
-
 
     # Read files in parallel
     print(
@@ -247,12 +249,12 @@ def parse(num_files=None, num_samples: int = 720_000):
         result = p.map(_parse, p_attrs, chunksize=workers_per_core)
         t2 = time.time()
 
-        # - assume 2 * 4 bytes per data point
+        # - assume 2 * 8 bytes per data point, with 2:1 compression
         in_size = 8 * N_files * N_samples
 
         print(
-            " I: (read took %.3f seconds; eff. rate: %.3f MiB/s)"
-            % (t2 - t1, in_size / (t2 - t1) / (2**20))
+            " I: (read took %.3f seconds; eff. rate: %.3f GiB/s)"
+            % (t2 - t1, in_size / (t2 - t1) / (2**30))
         )
 
         # - properly close pool

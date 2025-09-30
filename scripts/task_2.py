@@ -26,14 +26,15 @@ from typing import Optional, Tuple
 # Timekeeping
 import time
 
-# Filter type with human-readable name
-FILTER_TYPE: dict = {
-    -1: "unknown",
-    0: "low-pass",
-    1: "band-pass",
-    2: "band-stop",
-    3: "high-pass",
-}
+# OS-related hooks
+import os
+
+# Obtain logical cores count
+logical_cores = os.cpu_count()
+
+# - calculate number of free cores
+reserved_cores = 2
+free_cores = logical_cores - reserved_cores
 
 
 # Performs linear convolution between `x` and `h`
@@ -451,14 +452,14 @@ def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     N = s_data.shape[1]  # - obtain number of data points
     filters = [h1, h2, h3]  # - line up filters
-    X = rfft(s_data, n=N, axis=1, workers=-1)  # - calculate FFT 2-tensor
+    X = rfft(s_data, n=N, axis=1, workers=free_cores)  # - calculate FFT 2-tensor
 
     # - pad each filter to N, then calculate FFT
-    H = np.stack([rfft(h, n=N, workers=-1) for h in filters])
+    H = np.stack([rfft(h, n=N, workers=free_cores) for h in filters])
 
     # Calculate resulting 3-tensor, which is the
     # convolution of `s_data` and all 3 kernels
-    Y = irfft(H[:, None, :] * X[None, :, :], n=N, axis=2, workers=-1)
+    Y = irfft(H[:, None, :] * X[None, :, :], n=N, axis=2, workers=free_cores)
 
     # - split result by kernel (on planes 0, 1, 2)
     res_1, res_2, res_3 = Y[0], Y[1], Y[2]
