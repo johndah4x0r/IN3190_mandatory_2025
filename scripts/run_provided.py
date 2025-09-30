@@ -13,6 +13,7 @@ This script is based on `reference/bjorklund_extracts.py`.
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
+import h5py
 
 # OS-related hooks
 import os
@@ -57,12 +58,6 @@ free_cores = logical_cores - reserved_cores
 # Calculate worker count
 workers_per_core = 1
 
-# - set start method to `spawn`
-try:
-    multiprocessing.set_start_method("spawn", force=True)
-except:
-    pass
-
 # Inner routine for `parse`
 def _parse(attrs: (str, int)):
     """
@@ -85,9 +80,6 @@ def _parse(attrs: (str, int)):
         dt: (?)
             Collection of time steps
     """
-
-    # NEVER share `h5py` instance
-    import h5py
 
     # Obtain file name
     fname = attrs[0]
@@ -112,24 +104,17 @@ def _parse(attrs: (str, int)):
 
         # If missing data, pad with zeros
         if len(data) < n_samples:
-            data = np.pad(
-                data, (0, n_samples - len(data)), "constant", constant_values=0
-            )
+            data = np.pad(data, (0, n_samples - len(data)), "constant", constant_values=0)
 
         # Figure out the start time and generate a time vector
-        start_time_str = dataset.attrs["starttime"]
-        start_time = dateutil.parser.isoparse(
-            start_time_str
-        )  # Time attribute on ISO-format
+        start_time_str = dataset.attrs["starttime"] # - time attribute in ISO 8601
+        start_time = np.datetime64(dateutil.parser.isoparse(start_time_str))
 
-        dt = dataset.attrs["delta"]
-        deltas = np.linspace(
-            0, dt * (n_samples - 1), n_samples
-        )  # A duration which can be added to a datetime object
-        times = start_time + deltas * timedelta(seconds=1)
+        # - convert timestep to nanoseconds
+        dt = np.timedelta64(int(dataset.attrs["delta"] * 1e9), 'ns')
 
-        # Convert times to 64-bit integers
-        times = np.array(times, dtype="datetime64[ns]")
+        # - generate time vector
+        times = start_time + np.arange(n_samples) * dt
 
     return data, times, lats, lons, dt
 
@@ -208,27 +193,7 @@ def parse(num_files=None, num_samples: int = 720_000):
             Collection of time steps
     """
 
-    # Load from cache
-    # - check if `unpacked.h5` is older than all sources
-    if all([is_older(os.path.join(dat_path, f), cache_path) for f in fn_list]):
-        # Instantiate `h5py` HERE
-        import h5py
-
-        try:
-            with h5py.File("unpacked.h5", "r") as f:
-                data_collection = f["data_collection"][:]
-                unit = f["times_collection"].attrs["unit"]
-                times_collection = f["times_collection"][:].view(f"datetime64[{unit}]")
-
-                lats = f["lats"][:]
-                lons = f["lons"][:]
-                dt = f["dt"][:]
-
-            # - return only if the cache is "sane"
-            return data_collection, times_collection, lats, lons, dt
-        except (OSError, KeyError) as e:
-            print(f" W: Cache invalid ({e}); rebuilding....")
-
+    # Get counts
     if num_files:
         N_files = num_files
     else:
@@ -236,6 +201,37 @@ def parse(num_files=None, num_samples: int = 720_000):
 
     # Size of the datasets in the files. Hard coded unless you want dynamic allocation (lists, slower)
     N_samples = num_samples
+
+    # - assume 2 * 8 bytes per data point
+    in_size = 16 * N_files * N_samples
+
+    # Load from cache
+    # - check if `unpacked.h5` is older than all sources
+    if all(is_older(os.path.join(dat_path, f), cache_path) for f in fn_list):
+        try:
+            t0 = time.time()
+
+            with h5py.File("unpacked.h5", "r") as f:
+                data_collection = f["data_collection"][:]
+                unit = f["times_collection"].attrs["unit"]
+                times_collection = f["times_collection"][:].view(f"datetime64[{unit}]")
+
+                lats = f["lats"][:]
+                lons = f["lons"][:]
+                dt = f["dt"][:].view(f"timedelta64[{unit}]")
+
+            t1 = time.time()
+
+            # - calculate elapsed time and data rate
+            elapsed = t1 - t0
+            rate = in_size / elapsed / (2**20)
+
+            print(f" I: (read took {t1-t0:.3f} seconds; eff. rate: {rate:.3f} MiB/s)")
+
+            # - return only if the cache is "sane"
+            return data_collection, times_collection, lats, lons, dt
+        except (OSError, KeyError) as e:
+            print(f" W: Cache invalid ({e}); rebuilding....")
 
 
     # Read files in parallel
@@ -276,9 +272,6 @@ def parse(num_files=None, num_samples: int = 720_000):
     # Build cache
     print(" I: Building cache...")
 
-    # - instantiate `h5py` HERE
-    import h5py
-
     # - write to temporary file
     with h5py.File(cache_path + ".tmp", "w") as f:
         f.create_dataset(
@@ -294,7 +287,7 @@ def parse(num_files=None, num_samples: int = 720_000):
 
         f.create_dataset("lats", data=lats)
         f.create_dataset("lons", data=lons)
-        f.create_dataset("dt", data=dt)
+        f.create_dataset("dt", data=dt.view("int64"))
 
         # - flush FS caches
         f.flush()
