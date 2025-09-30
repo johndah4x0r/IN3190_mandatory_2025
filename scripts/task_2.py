@@ -13,6 +13,7 @@ from .fir import h1, h2, h3, LEN_H1, LEN_H2, LEN_H3
 # Import modules for general analysis
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.figure
 from scipy.signal import fftconvolve
 from scipy.fft import rfft, irfft
 
@@ -205,17 +206,22 @@ def __convolve_h3(m: np.ndarray) -> np.ndarray:
     return y
 
 
-def task_2a():
+def task_2a(show: bool = True) -> Optional[matplotlib.figure.Figure]:
     """
     A method that satisfies task 2a
 
     Parameters
     ----------
-    Does not accept any parameters
+    show : bool = True
+        Determines whether the generated figure should be shown
+
+        If `show == False`, then the function returns
+        the figure that would be shown.
 
     Returns
     -------
-    Does not return any values
+    fig : Optional[matplotlib.figure.Figure]
+        Figure with the relevant axes
     """
 
     print(" I: Executing task 2a...")
@@ -224,35 +230,48 @@ def task_2a():
     least = min([LEN_H1, LEN_H2, LEN_H3])
     n = np.arange(0, least)
 
+    # Set up figure and axes
+    fig, ax = plt.subplots(1, 1)
+
     # Plot the impulse responses
-    plt.plot(n, h1[n], "--.", label="$h_1$")
-    plt.plot(n, h2[n], "--.", label="$h_2$")
-    plt.plot(n, h3[n], "--.", label="$h_3$")
+    ax.plot(n, h1[n], "--.", label="$h_1$")
+    ax.plot(n, h2[n], "--.", label="$h_2$")
+    ax.plot(n, h3[n], "--.", label="$h_3$")
 
     # - set up grid and legend
-    plt.grid()
-    plt.legend()
+    ax.grid()
+    ax.legend()
 
     # - use proper title and axis labels
-    plt.title("Impulse response of FIR filters")
-    plt.xlabel("Input $n$ [1]")
-    plt.ylabel("Impulse response $h[n]$ [1]")
+    fig.suptitle("Task 2a")
+    ax.set_title("Impulse response of FIR filters")
+    ax.set_xlabel("Input $n$ [1]")
+    ax.set_ylabel("Impulse response $h[n]$ [1]")
 
     # - show figure
-    plt.show()
+    if show:
+        plt.show()
+        return None
+    else:
+        return fig
 
 
-def task_2b():
+def task_2b(show: bool = True) -> Optional[matplotlib.figure.Figure]:
     """
     A method that satisfies task 2b
 
     Parameters
     ----------
-    Does not accept any parameters
+    show : bool = True
+        Determines whether the generated figure should be shown
+
+        If `show == False`, then the function returns
+        the figure that would be shown.
 
     Returns
     -------
-    Does not return any values
+    fig : Optional[matplotlib.figure.Figure]
+        Figure with the relevant axes
     """
 
     print(" I: Executing task 2b...")
@@ -271,19 +290,32 @@ def task_2b():
     n_same = np.arange(len(x))
     n_full = np.arange(len(x) + len(h) - 1)
 
-    # Plot calculated and reference values
-    plt.plot(n_same, c_same, "-", label="same")
-    plt.plot(n_full, c_full, "-", label="full")
+    # Set up figure and axes
+    fig, ax = plt.subplots(1, 1)
 
-    plt.plot(n_full, ref_full, "--", label="full, reference")
-    plt.plot(n_same, ref_same, "--", label="same, reference")
+    # Plot calculated and reference values
+    ax.plot(n_same, c_same, "-", label="same", color="yellow")
+    ax.plot(n_same, ref_same, "--", label="same, reference", color="magenta")
+
+    ax.plot(n_full, c_full, "-", label="full", color="cyan")
+    ax.plot(n_full, ref_full, "--", label="full, reference", color="red")
 
     # Set up grid and legend
-    plt.grid()
-    plt.legend()
+    ax.grid()
+    ax.legend()
+
+    # Set up title and axis labels
+    fig.suptitle("Task 2b")
+    ax.set_title("Comparison between hand-rolled and external functions")
+    ax.set_xlabel("Discrete time $n$ [1]")
+    ax.set_ylabel("Convolution $x * h$ [1]")
 
     # Show figure
-    plt.show()
+    if show:
+        plt.show()
+        return None
+    else:
+        return fig
 
 
 def task_2c():
@@ -303,8 +335,8 @@ def task_2c():
 
 
 def task_2d(
-    n_points: int = 1000, fs: float = 100.0
-) -> Tuple[Tuple[np.ndarray, np.ndarray, np.ndarray], np.ndarray]:
+    n_points: int = 1000, fs: float = 100.0, show: bool = True
+) -> Optional[matplotlib.figure.Figure]:
     """
     A method that satisfies task 2d
 
@@ -314,14 +346,16 @@ def task_2d(
         Number of points on the unit circle
     fs : float = 100.0
         Sampling frequency (in hertz)
+    show : bool = True
+        Determines whether the generated figure should be shown
+
+        If `show == False`, then the function returns
+        the figure that would be shown.
 
     Returns
     -------
-    mag_1, mag_2, mag_3 : np.ndarray
-        Magnitudes for the DTFT of filters
-        `h1`, `h2`, `h3`
-    freqs : np.ndarray
-        Array of frequencies (in hertz)
+    fig : Optional[matplotlib.figure.Figure]
+        Figure with the relevant axes
     """
 
     print(f" I: Executing task 2d (n_points = {n_points}, fs(.3f) = {fs:.3f} Hz)")
@@ -342,26 +376,31 @@ def task_2d(
     H_2_mag = H_2_mag[: n_points // 2 + 1]
     H_3_mag = H_3_mag[: n_points // 2 + 1]
 
+    # Set up figure and axes
+    fig, ax = plt.subplots(1, 1)
+
     # Plot the magnitudes
     # - plot only the first half
-    plt.plot(freqs, H_1_mag, "-", label="response $h_1$")
-    plt.plot(freqs, H_2_mag, "--", label="response $h_2$")
-    plt.plot(freqs, H_3_mag, "--", label="response $h_3$")
+    ax.plot(freqs, H_1_mag, "-", label="response $h_1$")
+    ax.plot(freqs, H_2_mag, "--", label="response $h_2$")
+    ax.plot(freqs, H_3_mag, "--", label="response $h_3$")
 
     # Set up grid and legend
-    plt.grid()
-    plt.legend()
+    ax.grid()
+    ax.legend()
 
     # Set up title and axis labels
-    plt.title("Frequency response of FIR filters")
-    plt.xlabel("Frequency [Hz]")
-    plt.ylabel("Magnitude $|H|$ [1]")
+    fig.suptitle("Task 2d")
+    ax.set_title("Frequency response of FIR filters")
+    ax.set_xlabel("Frequency [Hz]")
+    ax.set_ylabel("Magnitude $|H|$ [1]")
 
     # Show plot
-    plt.show()
-
-    # Return magnitudes and frequencies
-    return (H_1_mag, H_2_mag, H_3_mag), freqs
+    if show:
+        plt.show()
+        return None
+    else:
+        return fig
 
 
 def task_2e():
@@ -381,9 +420,7 @@ def task_2e():
     pass
 
 
-def task_2f(
-    s_data: np.ndarray, serial: bool = False
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     A method that satisfies task 2f
 
@@ -434,7 +471,7 @@ def task_2f(
     return res_1, res_2, res_3
 
 
-def task_2g(res: Optional[np.ndarray]):
+def task_2g(res: Optional[np.ndarray], show: bool = True):
     pass
 
 
@@ -443,8 +480,11 @@ def main(
     fs: float = 100.0,
     s_data: Optional[np.ndarray] = None,
     show_section: bool = False,
-    serial: bool = False,
-) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    show_plots: bool = True,
+) -> Tuple[
+    Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]],
+    Optional[Tuple[matplotlib.figure.Figure, matplotlib.figure.Figure]],
+]:
     """
     Main method for task 2
 
@@ -460,14 +500,18 @@ def main(
         Data samples from stations
     show_section : bool = False
         Determines whether to show a section plot
-    serial : bool = False
-        Determines whether convolution operations
-        are performed serially
+    show_plots : bool = True
+        Determines whether to show the plots in-place
+
+        If `show_plots == False`, figures that would be
+        shown will be returned instead.
 
     Returns
     -------
-    (res_1, res_2, res_3) | None : Optional[Tuple[np.ndarray]]
+    (res_1, res_2, res_3) | None : Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]
         Filtered station data
+    (fig_2a, fig_2b, fig_2d): Optional[Tuple[matplotlib.figure.Figure, matplotlib.figure.Figure]]
+        Figures for task 2b and 2d
     """
 
     # Set up temporary arrays and
@@ -483,24 +527,27 @@ def main(
     del __r1, __r2
 
     # Run the tasks in order
-    task_2a()
-    task_2b()
+    fig_2a = task_2a(show=show_plots)
+    fig_2b = task_2b(show=show_plots)
     task_2c()
-    task_2d(n_points, fs)
+    fig_2d = task_2d(n_points, fs, show=show_plots)
     task_2e()
+
+    # - collect figures
+    figs = (fig_2a, fig_2b, fig_2d) if not show_plots else None
 
     # - do not proceed if station data is not provided
     if s_data is None:
-        return None
+        return None, figs
     # - (fall-through)
 
     # Run tasks 2f and 2g
-    res_1, res_2, res_3 = task_2f(s_data, serial)
+    res_1, res_2, res_3 = task_2f(s_data)
 
     if show_section:
         # - show section plot only if requested
         task_2g(None)
-    else:
+    elif show_plots:
         # - show filtered data for *one* station
         example_1 = res_1[0]
         example_2 = res_2[0]
@@ -527,7 +574,7 @@ def main(
         plt.show()
 
     # Return filtered data
-    return res_1, res_2, res_3
+    return (res_1, res_2, res_3), figs
 
 
 # In case we get imported:

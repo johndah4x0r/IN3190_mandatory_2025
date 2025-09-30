@@ -13,7 +13,6 @@ This script is based on `reference/bjorklund_extracts.py`.
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-import h5py
 
 # OS-related hooks
 import os
@@ -38,9 +37,14 @@ from typing import Optional, Tuple
 # Module to measure elapsed time
 import time
 
+# Use custom definitions
+from . import is_older
+
 # Set path for data
-cwd = os.path.abspath("") + "/"
-dat_path = cwd + "seismic_data/"
+cwd = os.path.abspath("")
+dat_path = os.path.join(cwd, "seismic_data")
+cache_path = os.path.join(cwd, "unpacked.h5")
+
 fn_list = os.listdir(dat_path)
 
 # Obtain logical cores count
@@ -53,6 +57,11 @@ free_cores = logical_cores - reserved_cores
 # Calculate worker count
 workers_per_core = 1
 
+# - set start method to `spawn`
+try:
+    multiprocessing.set_start_method("spawn", force=True)
+except:
+    pass
 
 # Inner routine for `parse`
 def _parse(attrs: (str, int)):
@@ -76,6 +85,9 @@ def _parse(attrs: (str, int)):
         dt: (?)
             Collection of time steps
     """
+
+    # NEVER share `h5py` instance
+    import h5py
 
     # Obtain file name
     fname = attrs[0]
@@ -162,17 +174,13 @@ def _unpack(
     lons = np.zeros(n_files)
     dt = np.zeros(n_files)
 
-    # Unpack serially
-    for ii, r in enumerate(result):
-        r_data, r_times, r_lats, r_lons, r_dt = r
-
-        # - store the results in their corresponding arrays
-        data_collection[ii, :] = r_data  # aggregate data
-        times_collection[ii, :] = r_times  # aggregate time
-
-        lats[ii] = r_lats  # aggregate latitude
-        lons[ii] = r_lons  # aggregate longitude
-        dt[ii] = r_dt  # aggregate timestep
+    # Unpack "Pythonically"
+    r_data, r_times, r_lats, r_lons, r_dt = zip(*result)
+    data_collection = np.vstack(r_data)
+    times_collection = np.vstack(r_times)
+    lats = np.array(r_lats)
+    lons = np.array(r_lons)
+    dt = np.array(r_dt)
 
     return data_collection, times_collection, lats, lons, dt
 
@@ -201,17 +209,25 @@ def parse(num_files=None, num_samples: int = 720_000):
     """
 
     # Load from cache
-    if os.path.exists("unpacked.h5"):
-        with h5py.File("unpacked.h5", "r") as f:
-            data_collection = f["data_collection"][:]
-            unit = f["times_collection"].attrs["unit"]
-            times_collection = f["times_collection"][:].view(f"datetime64[{unit}]")
+    # - check if `unpacked.h5` is older than all sources
+    if all([is_older(os.path.join(dat_path, f), cache_path) for f in fn_list]):
+        # Instantiate `h5py` HERE
+        import h5py
 
-            lats = f["lats"][:]
-            lons = f["lons"][:]
-            dt = f["dt"][:]
+        try:
+            with h5py.File("unpacked.h5", "r") as f:
+                data_collection = f["data_collection"][:]
+                unit = f["times_collection"].attrs["unit"]
+                times_collection = f["times_collection"][:].view(f"datetime64[{unit}]")
 
-        return data_collection, times_collection, lats, lons, dt
+                lats = f["lats"][:]
+                lons = f["lons"][:]
+                dt = f["dt"][:]
+
+            # - return only if the cache is "sane"
+            return data_collection, times_collection, lats, lons, dt
+        except (OSError, KeyError) as e:
+            print(f" W: Cache invalid ({e}); rebuilding....")
 
     if num_files:
         N_files = num_files
@@ -221,14 +237,15 @@ def parse(num_files=None, num_samples: int = 720_000):
     # Size of the datasets in the files. Hard coded unless you want dynamic allocation (lists, slower)
     N_samples = num_samples
 
-    # - read files in parallel
+
+    # Read files in parallel
     print(
         " I: Will read %d files in parallel across %d cores (%d workers per core)"
         % (N_files, free_cores, workers_per_core)
     )
 
     with multiprocessing.Pool(free_cores) as p:
-        p_attrs = [(dat_path + fn, N_samples) for fn in fn_list]
+        p_attrs = [(os.path.join(dat_path, fn), N_samples) for fn in fn_list]
 
         t1 = time.time()
         result = p.map(_parse, p_attrs, chunksize=workers_per_core)
@@ -238,9 +255,13 @@ def parse(num_files=None, num_samples: int = 720_000):
         in_size = 8 * N_files * N_samples
 
         print(
-            " I: (vector operation took %.3f seconds @ %.3f MiB/s)"
+            " I: (read took %.3f seconds; eff. rate: %.3f MiB/s)"
             % (t2 - t1, in_size / (t2 - t1) / (2**20))
         )
+
+        # - properly close pool
+        p.close()
+        p.join()
 
     # Unpack the result
     t3 = time.time()
@@ -255,7 +276,11 @@ def parse(num_files=None, num_samples: int = 720_000):
     # Build cache
     print(" I: Building cache...")
 
-    with h5py.File("unpacked.h5", "w") as f:
+    # - instantiate `h5py` HERE
+    import h5py
+
+    # - write to temporary file
+    with h5py.File(cache_path + ".tmp", "w") as f:
         f.create_dataset(
             "data_collection", data=data_collection, chunks=None, compression=None
         )
@@ -270,6 +295,12 @@ def parse(num_files=None, num_samples: int = 720_000):
         f.create_dataset("lats", data=lats)
         f.create_dataset("lons", data=lons)
         f.create_dataset("dt", data=dt)
+
+        # - flush FS caches
+        f.flush()
+
+    # - copy to `.h5` on success
+    os.replace(cache_path + ".tmp", cache_path)
 
     print("done")
     return r

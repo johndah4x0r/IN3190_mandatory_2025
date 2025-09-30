@@ -1,6 +1,7 @@
 # Ignore seismic data
 /seismic_data/
 /unpacked.h5
+/unpacked.h5.tmp
 
 # Ignore archives
 /archives/

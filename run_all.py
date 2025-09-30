@@ -23,16 +23,45 @@ import sys
 # - these scripts satisfy tasks 1, 2
 from scripts import run_provided, task_2
 
-# Run the provided script (task 1), then take
-# ownership of the returned station data
-print(" I: (run_all) Running `run_provided.main()`...")
-s_data, s_times, s_lats, s_lons, s_dt = run_provided.main()
+def main():
+    """
+    Main routine
 
-# Reset PyPlot to default settings
-mpl.rcParams.update(mpl.rcParamsDefault)
+    This routine *must* exist in order for spawn-based
+    multi-processing to work at all.
 
-# Run main routine for task 2, then take
-# ownereship of the returned filtered data
-# - don't show section data just yet
-print(" I: (run_all) Running `task_2.main(...)`...")
-filtered = task_2.main(1000, 100.0, s_data, False, True)
+    Parameters
+    ----------
+    Does not accept any parameters
+
+    Returns
+    -------
+    Does not return any values.
+    """
+
+    # Run the provided script (task 1), then take
+    # ownership of the returned station data
+    print(" I: (run_all) Running `run_provided.main()`...")
+    s_data, s_times, s_lats, s_lons, s_dt = run_provided.main()
+
+    # Reset PyPlot to default settings
+    mpl.rcParams.update(mpl.rcParamsDefault)
+
+    # Run main routine for task 2, then take
+    # ownereship of the returned filtered data
+    # - don't show section data just yet
+    print(" I: (run_all) Running `task_2.main(...)`...")
+    filtered, figs = task_2.main(1000, 100.0, s_data, show_section=False, show_plots=False)
+
+    # - make sure we get filtered data and figures in return,
+    # as we 1) have s_data, and 2) want to show the plots elsewhere
+    assert filtered is not None, "Filtered data weren't returned"
+    assert figs is not None, "No figures were returned"
+
+    print(" I: %d figures were generated" % len(figs))
+    plt.show()
+
+
+# PROPER IDIOM MUST BE USED
+if __name__ == "__main__":
+    main()
