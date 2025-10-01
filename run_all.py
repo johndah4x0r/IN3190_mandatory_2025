@@ -20,7 +20,7 @@ import sys
 
 # Import sub-scripts
 # - these scripts satisfy tasks 1, 2
-from scripts import run_provided, task_2
+from scripts import run_provided, task_2, task_3
 
 
 def main():
@@ -74,6 +74,13 @@ def main():
 
     print(" I: %d figures were generated" % (len(figs_1) + len(figs_2)))
     plt.show()
+
+    # Reset PyPlot to default settings
+    mpl.rcParams.update(mpl.rcParamsDefault)
+
+    # Unpacked filtered data, then run main routine for task 3
+    fd1, fd2, fd3 = filtered
+    task_3.main(s_dists, s_times, s_data, fd1, fd2, fd3)
 
 
 # PROPER IDIOM MUST BE USED
