@@ -3,6 +3,7 @@
 /unpacked.h5
 /unpacked.h5.tmp
 /task_*.npz
+/task_*.npz.tmp
 
 # Ignore archives
 /archives/

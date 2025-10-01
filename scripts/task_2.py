@@ -16,7 +16,9 @@ from . import is_older
 # Import modules for general analysis
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import matplotlib.figure
+from matplotlib.collections import LineCollection
 from scipy.signal import fftconvolve
 from scipy.fft import rfft, irfft
 
@@ -31,6 +33,7 @@ import time
 
 # OS-related hooks
 import os
+import sys
 
 # Obtain current directory
 cwd = os.path.abspath("")
@@ -41,6 +44,10 @@ logical_cores = os.cpu_count()
 # - calculate number of free cores
 reserved_cores = 2
 free_cores = logical_cores - reserved_cores
+
+
+def __fftconvolve(m: np.ndarray, h: np.ndarray) -> np.ndarray:
+    return np.apply_along_axis(lambda x: fftconvolve(x, h, mode="same"), 1, m)
 
 
 # Performs linear convolution between `x` and `h`
@@ -195,24 +202,6 @@ def dtft(h: np.ndarray, N: int, fs: float) -> Tuple[np.ndarray, np.ndarray]:
     return H, freqs
 
 
-# Convolve given signal matrix with FIR filter `h1`
-def __convolve_h1(m: np.ndarray) -> np.ndarray:
-    y = np.apply_along_axis(lambda x: fftconvolve(x, h1, mode="same"), 1, m)
-    return y
-
-
-# Convolve given signal matrix with FIR filter `h2`
-def __convolve_h2(m: np.ndarray) -> np.ndarray:
-    y = np.apply_along_axis(lambda x: fftconvolve(x, h2, mode="same"), 1, m)
-    return y
-
-
-# Convolve given signal matrix with FIR filter `h3`
-def __convolve_h3(m: np.ndarray) -> np.ndarray:
-    y = np.apply_along_axis(lambda x: fftconvolve(x, h3, mode="same"), 1, m)
-    return y
-
-
 def task_2a(show: bool = True) -> Optional[matplotlib.figure.Figure]:
     """
     A method that satisfies task 2a
@@ -301,7 +290,7 @@ def task_2b(show: bool = True) -> Optional[matplotlib.figure.Figure]:
     fig, ax = plt.subplots(1, 1)
 
     # Plot calculated and reference values
-    ax.plot(n_same, c_same, "-", label="same", color="yellow")
+    ax.plot(n_same, c_same, "-", label="same", color="darkgreen")
     ax.plot(n_same, ref_same, "--", label="same, reference", color="magenta")
 
     ax.plot(n_full, c_full, "-", label="full", color="cyan")
@@ -427,7 +416,9 @@ def task_2e():
     pass
 
 
-def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def task_2f(
+    s_data: np.ndarray, fallback: bool = False
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     A method that satisfies task 2f
 
@@ -437,6 +428,8 @@ def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         Array containing station data, with shape (S,T), where
         `S` is the number of stations, and `T` is the number of
         samples (separated by time)
+    fallback : bool = False
+        Uses fallback method to calculate convolution
 
     Returns
     -------
@@ -448,7 +441,15 @@ def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     print(" I: Executing task 2f")
 
-    t0 = time.time()
+    if fallback:
+        print(" W: (task_2f) Using fallback method...")
+        res_1 = __fftconvolve(s_data, h1)
+        res_2 = __fftconvolve(s_data, h2)
+        res_3 = __fftconvolve(s_data, h3)
+
+        print(" I: (shape is %s)" % repr(res_1.shape))
+
+        return res_1, res_2, res_3
 
     master_cache = os.path.join(cwd, "unpacked.h5")
     slave_cache = os.path.join(cwd, "task_2f.npz")
@@ -462,14 +463,14 @@ def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
             t0 = time.time()
 
             with np.load(slave_cache) as f:
-                res_1 = f["res_1"]
-                res_2 = f["res_2"]
-                res_3 = f["res_3"]
+                res_1 = f["res_1"].astype(np.float32)
+                res_2 = f["res_2"].astype(np.float32)
+                res_3 = f["res_3"].astype(np.float32)
 
             t1 = time.time()
 
             # Calculate size and transfer rate
-            f_size = 3 * np.prod(res_1.shape) * 8
+            f_size = 3 * np.prod(res_1.shape) * 4
             rate = f_size / (t1 - t0) / (2**30)
 
             print(f" I: (read took {t1-t0:.3f} seconds; eff. rate: {rate:.3f} GiB/s)")
@@ -479,11 +480,13 @@ def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
             print(f" W: (task_2f) Failed to load from cache ({e})")
     # - fall-through
 
+    t0 = time.time()
+
     # Perform manual FFT-based convolution
     # - this approach is supposedly faster, and saturates
     # memory lines earlier, though this would mean that
     # execution time is strongly dependent on the number
-    # of RAM lanes, and the DRAM refresh rate
+    # of RAM lanes and the DRAM refresh rate
 
     N = s_data.shape[1]  # - obtain number of data points
     filters = [h1, h2, h3]  # - line up filters
@@ -494,7 +497,9 @@ def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
     # Calculate resulting 3-tensor, which is the
     # convolution of `s_data` and all 3 kernels
-    Y = irfft(H[:, None, :] * X[None, :, :], n=N, axis=2, workers=free_cores)
+    Y = irfft(H[:, None, :] * X[None, :, :], n=N, axis=2, workers=free_cores).astype(
+        np.float32
+    )
 
     # - split result by kernel (on planes 0, 1, 2)
     res_1, res_2, res_3 = Y[0], Y[1], Y[2]
@@ -506,7 +511,7 @@ def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     # Build cache atomically
     try:
         # - save to temporary file
-        np.savez(tmp_cache, res_1=res_1, res_2=res_2, res_3=res_3, allow_picle=True)
+        np.savez(tmp_cache, res_1=res_1, res_2=res_2, res_3=res_3, allow_pickle=True)
 
         # - move to `.npz` file
         os.replace(tmp_cache, slave_cache)
@@ -517,16 +522,142 @@ def task_2f(s_data: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     return res_1, res_2, res_3
 
 
-def task_2g(res: Optional[np.ndarray], show: bool = True):
-    pass
+def task_2g(
+    res: Optional[np.ndarray] = None,
+    times: Optional[np.ndarray] = None,
+    dists: Optional[np.ndarray] = None,
+    *,
+    show: bool = True,
+    scale: float = 250,
+    color: str = "k",
+    linewidth: float = 0.4,
+    alpha: float = 0.8,
+    timedown: bool = False,
+    offset_unit: str = "km",
+) -> Optional[matplotlib.figure.Figure]:
+    """
+    A method that satisfies task 2g
+
+    Generates a section plot
+
+    Parameters
+    ----------
+    res : Optional[np.ndarray] = None
+        Result matrix to be shown - must be of shape (S, T)
+    times : Optional[np.ndarray]
+        Wall time at each station - must be of shape (S, T)
+    dists : Optional[np.ndarray]
+        Distances between each station and the event (in km)
+          - must be of shape (S,)
+    show : bool = True
+        Determines whether the generated figure should be shown
+
+        If `show == False`, then the function returns
+        the figure that would be shown.
+    scale : float, optional
+        Global amplitude scale factor.
+    color : str, optional
+        Trace line color.
+    linewidth : float, optional
+        Line width for each trace.
+    alpha : float, optional
+        Line transparency.
+    timedown : bool, optional
+        If True, time axis increases downward (default True).
+    offset_unit : str, optional
+        Label for offset axis ('km' or '°').
+
+    Returns
+    -------
+    fig : Optional[matplotlib.figure.Figure]
+        Figure with the relevant axes
+    """
+
+    # Do not proceed if none of the essential inputs are set
+    if res is None or times is None or dists is None:
+        raise ValueError("Both 'times' and 'dists' must be provided.")
+
+    if res.shape != times.shape:
+        raise ValueError("'res' and 'times' must have the same shape (S, T).")
+
+    if dists.shape[0] != res.shape[0]:
+        raise ValueError("'dists' length must match number of stations (S).")
+
+    # Print status
+    print(" I: Executing task 2g")
+
+    # --- Normalize amplitudes ---
+    rmax = np.nanmax(np.abs(res))
+
+    if not np.isfinite(rmax) or rmax == 0:
+        rmax = 1.0
+
+    res_scaled = res / rmax * scale
+
+    amp_max = np.nanmax(np.abs(res), axis=1)  # shape (S,)
+    amp_norm = amp_max / amp_max.max()  # normalize
+    alpha_values = 0.2 + 0.8 * amp_norm  # map to 0.2–1.0 range
+
+    # --- Convert to float days (1 day = 86400 s) ---
+    # Round to milliseconds to keep precision manageable
+    times_days = times.astype("datetime64[ns]").astype("int64") * 1.0e-9
+    times_days = mdates.epoch2num(times_days)
+
+    # --- Build line segments for fast vectorized plotting ---
+    segments = [
+        np.column_stack([times_days[i], dists[i] + res_scaled[i]])
+        for i in range(res.shape[0])
+    ]
+
+    lc = LineCollection(segments, colors=color, linewidths=linewidth, alpha=None)
+
+    # --- Plot ---
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Per-line RGBA colours (alpha per trace)
+    rgba = np.zeros((len(segments), 4))
+    rgba[:, :3] = [0, 0, 0]  # RGB black
+    rgba[:, 3] = alpha_values
+    lc.set_color(rgba)
+    ax.add_collection(lc)
+
+    ax.add_collection(lc)
+    ax.set_xlim(np.nanmin(times_days), np.nanmax(times_days))
+    ax.set_ylim(dists.min(), (dists.max() // 5000 + 1) * 5000)
+
+    # --- Format UTC time axis ---
+    locator = mdates.AutoDateLocator()
+    formatter = mdates.ConciseDateFormatter(locator)
+    ax.xaxis.set_major_locator(locator)
+    ax.xaxis.set_major_formatter(formatter)
+    ax.set_xlabel("UTC Time")
+    ax.set_ylabel(f"Offset [{offset_unit}]")
+
+    # - invert axis if requested
+    if timedown:
+        ax.invert_yaxis()
+
+    # Show grid, and adjust layout
+    ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
+    fig.tight_layout()
+
+    # Show figure if requested
+    if show:
+        plt.show()
+        return None
+    else:
+        return fig
 
 
 def main(
-    n_points: int = 1000,
+    n_points: int = 100,
     fs: float = 100.0,
     s_data: Optional[np.ndarray] = None,
+    s_times: Optional[np.ndarray] = None,
+    s_dists: Optional[np.ndarray] = None,
     show_section: bool = False,
     show_plots: bool = True,
+    fallback: bool = False,
 ) -> Tuple[
     Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]],
     Optional[Tuple[matplotlib.figure.Figure, matplotlib.figure.Figure]],
@@ -544,6 +675,10 @@ def main(
         (relevant for task 2d)
     s_data : Optional[np.ndarray] = None
         Data samples from stations
+    s_times : Optional[np.ndarray] = None
+        Wall time at each station
+    s_dists : Optional[np.ndarray] = None
+        Distances between each station and the event (in km)
     show_section : bool = False
         Determines whether to show a section plot
     show_plots : bool = True
@@ -551,12 +686,14 @@ def main(
 
         If `show_plots == False`, figures that would be
         shown will be returned instead.
+    fallback : bool = False
+        Uses fallback method to calculate convolution
 
     Returns
     -------
     (res_1, res_2, res_3) | None : Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]
         Filtered station data
-    (fig_2a, fig_2b, fig_2d): Optional[Tuple[matplotlib.figure.Figure, matplotlib.figure.Figure]]
+    (fig_2a, fig_2b, fig_2d, fig_2g) | None: Optional[Tuple[matplotlib.figure.Figure, matplotlib.figure.Figure, matplotlib.figure.Figure]]
         Figures for task 2b and 2d
     """
 
@@ -588,11 +725,14 @@ def main(
     # - (fall-through)
 
     # Run tasks 2f and 2g
-    res_1, res_2, res_3 = task_2f(s_data)
+    res_1, res_2, res_3 = task_2f(s_data, fallback=fallback)
 
     if show_section:
         # - show section plot only if requested
-        task_2g(None)
+        fig_2g = task_2g(res_2, s_times, s_dists, show=show_plots)
+
+        # - append `figs_2g`
+        figs = None if figs is None else (figs[0], figs[1], figs[2], fig_2g)
     elif show_plots:
         # - show filtered data for *one* station
         example_1 = res_1[0]
@@ -622,6 +762,12 @@ def main(
     # Return filtered data
     return (res_1, res_2, res_3), figs
 
+
+# Disallow direct execution
+if __name__ == "__main__":
+    print(" E: Direct execution not allowed")
+    print("Please use `run_all.py' instead")
+    sys.exit(1)
 
 # In case we get imported:
 # set up temporary arrays

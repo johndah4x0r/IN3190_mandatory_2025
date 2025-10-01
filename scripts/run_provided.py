@@ -11,6 +11,7 @@ This script is based on `reference/bjorklund_extracts.py`.
 
 # Necessary modules for parsing and general analysis
 import matplotlib.pyplot as plt
+import matplotlib.figure
 import numpy as np
 import scipy
 import h5py
@@ -60,26 +61,28 @@ workers_per_core = 1
 
 
 # Inner routine for `parse`
-def _parse(attrs: (str, int)):
+def __parse(attrs: (str, int)):
     """
     Inner routine for `parse`
 
-    Accepts:
-        attrs: (str, int)
-            attrs[0]: str - File to be read
-            attrs[1]: int - Number of samples to be read from each file
+    Parameters
+    ----------
+    attrs: (str, int)
+        attrs[0]: str - File to be read
+        attrs[1]: int - Number of samples to be read from each file
 
-    Returns:
-        data: np.ndarray
-            Collection of data points
-        times: np.ndarray
-            Collection of time stamps
-        lats: np.ndarray
-            Collection of station latitudes
-        lons: np.ndarray
-            Collection of station longitudes
-        dt: (?)
-            Collection of time steps
+    Returns
+    -------
+    data: np.ndarray
+        Collection of data points
+    times: np.ndarray
+        Collection of time stamps
+    lats: np.ndarray
+        Collection of station latitudes
+    lons: np.ndarray
+        Collection of station longitudes
+    dt: (?)
+        Collection of time steps
     """
 
     # Obtain file name
@@ -101,7 +104,7 @@ def _parse(attrs: (str, int)):
             "/" + level1[0] + "/" + level2[0]
         ]  # Reading dataset in subgroup
 
-        data = dataset[:]  # Extract numpy array from dataset object
+        data = dataset[:].astype(np.float32)  # Extract numpy array from dataset object
 
         # If missing data, pad with zeros
         if len(data) < n_samples:
@@ -122,7 +125,7 @@ def _parse(attrs: (str, int)):
     return data, times, lats, lons, dt
 
 
-def _unpack(
+def __unpack(
     result,
     n_files: int,
     n_samples: int,
@@ -174,26 +177,29 @@ def _unpack(
 
 
 # Read files and store contents. Accepts user input for number of files to read.
-def parse(num_files=None, num_samples: int = 720_000):
+def parse(num_files: Optional[int] = None, num_samples: int = 720_000):
     """
     Reads files and stores their contents
 
-    Accepts:
-        num_files (default: None)
-            Number of files to read
-        num_samples (default: 720_000)
-            Number of samples to read from each file
-    Returns:
-        data_collection: np.ndarray
-            Collection of data points
-        times_collection: np.ndarray
-            Collection of time stamps
-        lats: np.ndarray
-            Collection of station latitudes
-        lons: np.ndarray
-            Collection of station longitudes
-        dt: np.ndarray
-            Collection of time steps
+    Parameters
+    ----------
+    num_files : Optional[int] = None
+        Number of files to read
+    num_samples : int = 720_000
+        Number of samples to read from each file
+
+    Returns
+    -------
+    data_collection: np.ndarray
+        Collection of data points
+    times_collection: np.ndarray
+        Collection of time stamps
+    lats: np.ndarray
+        Collection of station latitudes
+    lons: np.ndarray
+        Collection of station longitudes
+    dt: np.ndarray
+        Collection of time steps
     """
 
     # Get counts
@@ -205,8 +211,8 @@ def parse(num_files=None, num_samples: int = 720_000):
     # Size of the datasets in the files. Hard coded unless you want dynamic allocation (lists, slower)
     N_samples = num_samples
 
-    # - assume 2 * 8 bytes per data point
-    in_size = 16 * N_files * N_samples
+    # - assume 12 bytes per data point
+    in_size = 12 * N_files * N_samples
 
     # Load from cache
     # - check if `unpacked.h5` is older than all sources
@@ -215,7 +221,7 @@ def parse(num_files=None, num_samples: int = 720_000):
             t0 = time.time()
 
             with h5py.File("unpacked.h5", "r") as f:
-                data_collection = f["data_collection"][:]
+                data_collection = f["data_collection"][:].astype(np.float32)
                 unit = f["times_collection"].attrs["unit"]
                 times_collection = f["times_collection"][:].view(f"datetime64[{unit}]")
 
@@ -246,7 +252,8 @@ def parse(num_files=None, num_samples: int = 720_000):
         p_attrs = [(os.path.join(dat_path, fn), N_samples) for fn in fn_list]
 
         t1 = time.time()
-        result = p.map(_parse, p_attrs, chunksize=workers_per_core)
+        # - use `__parse` backend
+        result = p.map(__parse, p_attrs, chunksize=workers_per_core)
         t2 = time.time()
 
         # - assume 2 * 8 bytes per data point, with 2:1 compression
@@ -263,7 +270,7 @@ def parse(num_files=None, num_samples: int = 720_000):
 
     # Unpack the result
     t3 = time.time()
-    r = _unpack(result, N_files, N_samples)
+    r = __unpack(result, N_files, N_samples)
     t4 = time.time()
 
     print(" I: (unpacking took %.3f seconds)" % (t4 - t3))
@@ -279,6 +286,7 @@ def parse(num_files=None, num_samples: int = 720_000):
         f.create_dataset(
             "data_collection", data=data_collection, chunks=None, compression=None
         )
+
         dset = f.create_dataset(
             "times_collection",
             data=times_collection.view("int64"),
@@ -301,7 +309,7 @@ def parse(num_files=None, num_samples: int = 720_000):
     return r
 
 
-def plot_map(lats, lons, tonga_latlon):
+def plot_map(lats, lons, tonga_latlon, show: bool = True):
     northward_offset = 90  # As in sample program
     central_lat = tonga_latlon[0] + northward_offset
     central_lon = tonga_latlon[1]
@@ -350,10 +358,14 @@ def plot_map(lats, lons, tonga_latlon):
         transform=ccrs.PlateCarree(),
     )  # Transform is PlateCarree regardless of projection
 
-    plt.show()
+    if show:
+        plt.show()
+        return None
+    else:
+        return fig
 
 
-def circle_distance(n_files, lats, lons, tonga_latlon):
+def circle_distance(n_files, lats, lons, tonga_latlon, show: bool = True):
     # Calculate great circle distance. Using geopy.great_circle
     dists = []
     for i in range(n_files):
@@ -361,15 +373,14 @@ def circle_distance(n_files, lats, lons, tonga_latlon):
             great_circle((tonga_latlon[0], tonga_latlon[1]), (lats[i], lons[i])).m
         )
 
-    dists = np.array(dists)
-    dists_km = dists / 1000
+    dists_km = np.array(dists) / 1000
 
-    print()
-    print(
-        " I: Smallest great cricle distance is {:.2f} km. Largest great circle distance is {:.2f} km".format(
-            np.min(dists_km), np.max(dists_km)
-        )
-    )
+    # - Obtain smallest and largest distances
+    dist_min, dist_max = np.min(dists_km), np.max(dists_km)
+
+    # - Break output into two lines
+    print(f" I: Smallest great cricle distance is {dist_min:.2f} km")
+    print(f" I: Largest great circle distance is {dist_max:.2f} km")
 
     plt.style.use("seaborn-whitegrid")
     n_vec = np.linspace(0, n_files - 1, n_files)
@@ -379,12 +390,17 @@ def circle_distance(n_files, lats, lons, tonga_latlon):
     ax.set_xlabel("Station number", fontsize=28)
     ax.set_ylabel("Distance, [km]", fontsize=28)
     ax.set_title("Great circle distances between Hunga Tonga and stations", fontsize=28)
-    plt.show()
 
-    return dists_km
+    if show:
+        plt.show()
+        return dists_km, None
+    else:
+        return dists_km, fig
 
 
-def main() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def main(
+    show_plots: bool = True,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Main routine for `run_provided`
 
@@ -410,6 +426,10 @@ def main() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
     dt : np.ndarray
         A flat array containing the time step for each station
+    dists : np.ndarray
+        Distances between each station and the event (in km)
+    map_fig, dist_fig : Tuple[Optional[matplotlib.figure.Figure]]
+        Figures to be shown
     """
 
     print(
@@ -425,20 +445,30 @@ def main() -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     tonga_latlon = [-20.550, -175.385]  # latitude and longitude
 
     # Map
-    plot_map(lats, lons, tonga_latlon)
+    map_fig = plot_map(lats, lons, tonga_latlon, show=show_plots)
 
     # Obtain great circle distances
     # - the shortest and longest distances are already
     # written to standard output, so I don't exactly
     # know what to do with the returned array
-    dists_km = circle_distance(n_files, lats, lons, tonga_latlon)
+    dists_km, dist_fig = circle_distance(
+        n_files, lats, lons, tonga_latlon, show=show_plots
+    )
 
     # Return segregated data
-    return data_collection, times_collection, lats, lons, dt
+    return (
+        data_collection,
+        times_collection,
+        lats,
+        lons,
+        dt,
+        dists_km,
+        (map_fig, dist_fig),
+    )
 
 
+# Disallow direct execution
 if __name__ == "__main__":
-    # Disallow direct execution
     print(" E: Direct execution not allowed")
     print("Please use `run_all.py' instead")
     sys.exit(1)
