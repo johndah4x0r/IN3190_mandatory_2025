@@ -451,17 +451,19 @@ def task_2f(
 
         return res_1, res_2, res_3
 
+    # Obtain paths to cache files
     master_cache = os.path.join(cwd, "unpacked.h5")
     slave_cache = os.path.join(cwd, "task_2f.npz")
     tmp_cache = os.path.join(cwd, "task_2f_tmp.npz")
 
+    # Load from cache only if it is up-to-date
     if is_older(master_cache, slave_cache):
-        # Everything is as expected - load from cache
         print(" I: (task_2f) Reading from cache...")
 
         try:
             t0 = time.time()
 
+            # - use Numpy as backend
             with np.load(slave_cache) as f:
                 res_1 = f["res_1"].astype(np.float32)
                 res_2 = f["res_2"].astype(np.float32)
@@ -469,10 +471,11 @@ def task_2f(
 
             t1 = time.time()
 
-            # Calculate size and transfer rate
+            # - calculate size and transfer rate
             f_size = 3 * np.prod(res_1.shape) * 4
             rate = f_size / (t1 - t0) / (2**30)
 
+            # - print status
             print(f" I: (read took {t1-t0:.3f} seconds; eff. rate: {rate:.3f} GiB/s)")
 
             return res_1, res_2, res_3
@@ -480,23 +483,27 @@ def task_2f(
             print(f" W: (task_2f) Failed to load from cache ({e})")
     # - fall-through
 
-    t0 = time.time()
-
     # Perform manual FFT-based convolution
     # - this approach is supposedly faster, and saturates
     # memory lines earlier, though this would mean that
     # execution time is strongly dependent on the number
-    # of RAM lanes and the DRAM refresh rate
+    # of RAM lanes and the memory clock speed
+
+    # - start timer
+    t0 = time.time()
 
     N = s_data.shape[1]  # - obtain number of data points
     filters = [h1, h2, h3]  # - line up filters
-    X = rfft(s_data, n=N, axis=1, workers=free_cores)  # - calculate FFT 2-tensor
+    X = rfft(s_data, n=N, axis=1, workers=free_cores)  # - calculate row FFT 2-tensor
 
-    # - pad each filter to N, then calculate FFT
+    # - pad each filter to N, then calculate row FFT 2-tensor
     H = np.stack([rfft(h, n=N, workers=free_cores) for h in filters])
 
     # Calculate resulting 3-tensor, which is the
     # convolution of `s_data` and all 3 kernels
+    # - note that we're merely performing row-on-row
+    # multiplication, and not tensor contraction
+    # (which is implied by the inverse FFT)
     Y = irfft(H[:, None, :] * X[None, :, :], n=N, axis=2, workers=free_cores).astype(
         np.float32
     )
@@ -504,9 +511,11 @@ def task_2f(
     # - split result by kernel (on planes 0, 1, 2)
     res_1, res_2, res_3 = Y[0], Y[1], Y[2]
 
+    # - stop timer
     t1 = time.time()
 
-    print(" I: (operation took %.3f seconds)" % (t1 - t0))
+    # - print status
+    print(f" I: (operation took {t1-t0:.3f} seconds)")
 
     # Build cache atomically
     try:
@@ -577,6 +586,7 @@ def task_2g(
     if res is None or times is None or dists is None:
         raise ValueError("Both 'times' and 'dists' must be provided.")
 
+    # Validate inputs
     if res.shape != times.shape:
         raise ValueError("'res' and 'times' must have the same shape (S, T).")
 
@@ -636,6 +646,10 @@ def task_2g(
     # - invert axis if requested
     if timedown:
         ax.invert_yaxis()
+
+    # Set titles
+    ax.set_title("Section plot - band-pass")
+    fig.suptitle("Task 2g")
 
     # Show grid, and adjust layout
     ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
