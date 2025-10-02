@@ -6,10 +6,11 @@ PROJECT_DATA_ZIP := archives/project_data.zip
 
 all: seismic_data/
 	python3 run_all.py
-	
-clean:
 
-purge:
+clean:
+	rm -f unpacked.h5 task_*.npz
+
+purge: clean
 	rm -rf seismic_data/
 
 seismic_data/:

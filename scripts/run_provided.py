@@ -293,6 +293,7 @@ def parse(num_files: Optional[int] = None, num_samples: int = 720_000):
             chunks=None,
             compression=None,
         )
+
         dset.attrs["unit"] = "ns"
 
         f.create_dataset("lats", data=lats)
@@ -314,7 +315,7 @@ def plot_map(lats, lons, tonga_latlon, show: bool = True):
     central_lat = tonga_latlon[0] + northward_offset
     central_lon = tonga_latlon[1]
 
-    fig = plt.figure(figsize=(15, 15))
+    fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(
         1,
         1,
@@ -384,12 +385,12 @@ def circle_distance(n_files, lats, lons, tonga_latlon, show: bool = True):
 
     plt.style.use("seaborn-whitegrid")
     n_vec = np.linspace(0, n_files - 1, n_files)
-    fig = plt.figure(figsize=(15, 10))
+    fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(111)
     ax.scatter(n_vec, np.sort(dists_km), s=0.5)
-    ax.set_xlabel("Station number", fontsize=28)
-    ax.set_ylabel("Distance, [km]", fontsize=28)
-    ax.set_title("Great circle distances between Hunga Tonga and stations", fontsize=28)
+    ax.set_xlabel("Station number")
+    ax.set_ylabel("Distance [km]")
+    ax.set_title("Great circle distances between Hunga Tonga and stations")
 
     if show:
         plt.show()

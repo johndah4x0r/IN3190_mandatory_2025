@@ -227,7 +227,7 @@ def task_2a(show: bool = True) -> Optional[matplotlib.figure.Figure]:
     n = np.arange(0, least)
 
     # Set up figure and axes
-    fig, ax = plt.subplots(1, 1)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
 
     # Plot the impulse responses
     ax.plot(n, h1[n], "--.", label="$h_1$")
@@ -287,7 +287,7 @@ def task_2b(show: bool = True) -> Optional[matplotlib.figure.Figure]:
     n_full = np.arange(len(x) + len(h) - 1)
 
     # Set up figure and axes
-    fig, ax = plt.subplots(1, 1)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
 
     # Plot calculated and reference values
     ax.plot(n_same, c_same, "-", label="same", color="darkgreen")
@@ -373,7 +373,7 @@ def task_2d(
     H_3_mag = H_3_mag[: n_points // 2 + 1]
 
     # Set up figure and axes
-    fig, ax = plt.subplots(1, 1)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
 
     # Plot the magnitudes
     # - plot only the first half
@@ -609,7 +609,6 @@ def task_2g(
     alpha_values = 0.2 + 0.8 * amp_norm  # map to 0.2–1.0 range
 
     # --- Convert to float days (1 day = 86400 s) ---
-    # Round to milliseconds to keep precision manageable
     times_days = times.astype("datetime64[ns]").astype("int64") * 1.0e-9
     times_days = mdates.epoch2num(times_days)
 

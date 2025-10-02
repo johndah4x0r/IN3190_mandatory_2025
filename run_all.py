@@ -79,8 +79,16 @@ def main():
     mpl.rcParams.update(mpl.rcParamsDefault)
 
     # Unpacked filtered data, then run main routine for task 3
+    print(" I: (run_all) Running `task_3.main(...)`...")
+
     fd1, fd2, fd3 = filtered
-    task_3.main(s_dists, s_times, s_data, fd1, fd2, fd3)
+    fig = task_3.main(
+        s_dists, s_times, s_data, fd1, fd2, fd3, reuse=True, show_plots=False
+    )
+
+    assert fig is not None, "No figure was returned"
+
+    plt.show()
 
 
 # PROPER IDIOM MUST BE USED
