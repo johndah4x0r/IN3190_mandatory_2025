@@ -200,11 +200,11 @@ def task_3b(
     # Calculate celerity (in kilometers per hour)
     # - time is in days; convert to hours
     cel = m / 24
-    cel_si = cel / 3.6 # - convert to meters per second
+    cel_si = cel / 3.6  # - convert to meters per second
 
-    print(f" I: (task_3b) Estimated celerity: {cel:.1f} km/h, {cel_si:.4f} m/s")
+    print(f" I: (task_3b) Estimated celerity: {cel:.1f} km/h, {cel_si:.2f} m/s")
     print(f" I: (task_3b) R-squared value: {rel**2:.3f}")
-    
+
     # Obtain regression values
     reg_x = np.linspace(times.min(), times.max(), 1000)
     reg_y = m * reg_x + y0

@@ -74,9 +74,7 @@ def main():
     print(" I: (run_all) Running `task_3.main(...)`...", file=sys.stderr)
 
     fd1, fd2, fd3 = filtered
-    task_3.main(
-        s_dists, s_times, s_data, fd1, fd2, fd3, reuse=True, show_plots=True
-    )
+    task_3.main(s_dists, s_times, s_data, fd1, fd2, fd3, reuse=True, show_plots=True)
 
 
 # PROPER IDIOM MUST BE USED

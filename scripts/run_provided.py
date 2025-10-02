@@ -235,7 +235,10 @@ def parse(num_files: Optional[int] = None, num_samples: int = 720_000):
             elapsed = t1 - t0
             rate = in_size / elapsed / (2**30)
 
-            print(f" I: (read took {t1-t0:.3f} seconds; eff. rate: {rate:.3f} GiB/s)", file=sys.stderr)
+            print(
+                f" I: (read took {t1-t0:.3f} seconds; eff. rate: {rate:.3f} GiB/s)",
+                file=sys.stderr,
+            )
 
             # - return only if the cache is "sane"
             return data_collection, times_collection, lats, lons, dt
@@ -262,7 +265,7 @@ def parse(num_files: Optional[int] = None, num_samples: int = 720_000):
         print(
             " I: (read took %.3f seconds; eff. rate: %.3f GiB/s)"
             % (t2 - t1, in_size / (t2 - t1) / (2**30)),
-            file=sys.stderr
+            file=sys.stderr,
         )
 
         # - properly close pool
@@ -439,7 +442,7 @@ def main(
     print(
         " I: Found %d logical cores (%d reserved, %d free)"
         % (logical_cores, reserved_cores, free_cores),
-        file=sys.stderr
+        file=sys.stderr,
     )
 
     # READ DATA
