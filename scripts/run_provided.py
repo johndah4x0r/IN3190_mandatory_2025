@@ -235,12 +235,12 @@ def parse(num_files: Optional[int] = None, num_samples: int = 720_000):
             elapsed = t1 - t0
             rate = in_size / elapsed / (2**30)
 
-            print(f" I: (read took {t1-t0:.3f} seconds; eff. rate: {rate:.3f} GiB/s)")
+            print(f" I: (read took {t1-t0:.3f} seconds; eff. rate: {rate:.3f} GiB/s)", file=sys.stderr)
 
             # - return only if the cache is "sane"
             return data_collection, times_collection, lats, lons, dt
         except (OSError, KeyError) as e:
-            print(f" W: Cache invalid ({e}); rebuilding....")
+            print(f" W: Cache invalid ({e}); rebuilding....", file=sys.stderr)
 
     # Read files in parallel
     print(
@@ -261,7 +261,8 @@ def parse(num_files: Optional[int] = None, num_samples: int = 720_000):
 
         print(
             " I: (read took %.3f seconds; eff. rate: %.3f GiB/s)"
-            % (t2 - t1, in_size / (t2 - t1) / (2**30))
+            % (t2 - t1, in_size / (t2 - t1) / (2**30)),
+            file=sys.stderr
         )
 
         # - properly close pool
@@ -273,13 +274,13 @@ def parse(num_files: Optional[int] = None, num_samples: int = 720_000):
     r = __unpack(result, N_files, N_samples)
     t4 = time.time()
 
-    print(" I: (unpacking took %.3f seconds)" % (t4 - t3))
+    print(" I: (unpacking took %.3f seconds)" % (t4 - t3), file=sys.stderr)
 
     # - unpack result syntactically
     data_collection, times_collection, lats, lons, dt = r
 
     # Build cache
-    print(" I: Building cache...")
+    print(" I: Building cache...", file=sys.stderr)
 
     # - write to temporary file
     with h5py.File(cache_path + ".tmp", "w") as f:
@@ -363,6 +364,7 @@ def plot_map(lats, lons, tonga_latlon, show: bool = True):
         plt.show()
         return None
     else:
+        plt.close(fig)
         return fig
 
 
@@ -380,8 +382,8 @@ def circle_distance(n_files, lats, lons, tonga_latlon, show: bool = True):
     dist_min, dist_max = np.min(dists_km), np.max(dists_km)
 
     # - Break output into two lines
-    print(f" I: Smallest great cricle distance is {dist_min:.2f} km")
-    print(f" I: Largest great circle distance is {dist_max:.2f} km")
+    print(f" I: Smallest great cricle distance is {dist_min:.2f} km", file=sys.stderr)
+    print(f" I: Largest great circle distance is {dist_max:.2f} km", file=sys.stderr)
 
     plt.style.use("seaborn-whitegrid")
     n_vec = np.linspace(0, n_files - 1, n_files)
@@ -396,6 +398,7 @@ def circle_distance(n_files, lats, lons, tonga_latlon, show: bool = True):
         plt.show()
         return dists_km, None
     else:
+        plt.close(fig)
         return dists_km, fig
 
 
@@ -435,7 +438,8 @@ def main(
 
     print(
         " I: Found %d logical cores (%d reserved, %d free)"
-        % (logical_cores, reserved_cores, free_cores)
+        % (logical_cores, reserved_cores, free_cores),
+        file=sys.stderr
     )
 
     # READ DATA

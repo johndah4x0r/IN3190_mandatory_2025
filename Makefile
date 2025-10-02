@@ -9,6 +9,7 @@ all: seismic_data/
 
 clean:
 	rm -f unpacked.h5 task_*.npz
+	rm -rf tmpfigs
 
 purge: clean
 	rm -rf seismic_data/

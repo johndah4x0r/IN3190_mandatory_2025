@@ -41,21 +41,17 @@ def main():
 
     # Run the provided script (task 1), then take
     # ownership of the returned station data
-    print(" I: (run_all) Running `run_provided.main()`...")
-    s_data, s_times, s_lats, s_lons, s_dt, s_dists, figs_1 = run_provided.main(
-        show_plots=False
+    print(" I: (run_all) Running `run_provided.main()`...", file=sys.stderr)
+    s_data, s_times, s_lats, s_lons, s_dt, s_dists, _ = run_provided.main(
+        show_plots=True
     )
-
-    # - make sure we get figures in return
-    assert all(f is not None for f in figs_1), "Not all figures were returned"
-    plt.show()
 
     # Reset PyPlot to default settings
     mpl.rcParams.update(mpl.rcParamsDefault)
 
     # Run main routine for task 2, then take
     # ownereship of the returned filtered data
-    print(" I: (run_all) Running `task_2.main(...)`...")
+    print(" I: (run_all) Running `task_2.main(...)`...", file=sys.stderr)
     filtered, figs_2 = task_2.main(
         1000,
         100.0,
@@ -63,32 +59,24 @@ def main():
         s_times,
         s_dists,
         show_section=True,
-        show_plots=False,
+        show_plots=True,
         fallback=False,
     )
 
     # - make sure we get filtered data and figures in return,
     # as we 1) have s_data, and 2) want to show the plots elsewhere
     assert filtered is not None, "Filtered data weren't returned"
-    assert figs_2 is not None, "No figures were returned"
-
-    print(" I: %d figures were generated" % (len(figs_1) + len(figs_2)))
-    plt.show()
 
     # Reset PyPlot to default settings
     mpl.rcParams.update(mpl.rcParamsDefault)
 
     # Unpacked filtered data, then run main routine for task 3
-    print(" I: (run_all) Running `task_3.main(...)`...")
+    print(" I: (run_all) Running `task_3.main(...)`...", file=sys.stderr)
 
     fd1, fd2, fd3 = filtered
-    fig = task_3.main(
-        s_dists, s_times, s_data, fd1, fd2, fd3, reuse=True, show_plots=False
+    task_3.main(
+        s_dists, s_times, s_data, fd1, fd2, fd3, reuse=True, show_plots=True
     )
-
-    assert fig is not None, "No figure was returned"
-
-    plt.show()
 
 
 # PROPER IDIOM MUST BE USED

@@ -8,6 +8,12 @@
 # Ignore archives
 /archives/
 
+# Ignore generated figures
+/tmpfigs/
+
+# Ignore report PDF
+/*.pdf
+
 # Ignore Python-generated files, as well as
 # other blobs
 
